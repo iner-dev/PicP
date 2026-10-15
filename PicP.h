@@ -11,7 +11,27 @@
 
 #include <xc.h>
 
+
+// liste des modules pour l'activation
+//#define analog_module
+//#define TRM0_module
+//#define TRM1_module
+//#define TRM2_module // incompatible avec PWM(les commandes PWM sont desactivé)
+//#define TRM3_module
+//#define CCP1_module
+//#define CCP2_module
+//#define aff7seg_module
+//#define KeyPad_module
+//#define Sequancial_module
+
+
+
+
+
+
 #define enable 1
+#define enable_int_rising 1
+#define enable_int_falling 2
 #define disable 0
 
 #define byteMerge(A,B,Mask) ((A & ~Mask)|(B & Mask)) // fusione binairemant 2 variables en fonction du mask 0:A 1:B
@@ -20,15 +40,7 @@ typedef volatile unsigned char t_port;
 typedef unsigned char octet; 
 
 void perte_temps(int tempo); // pert des tempo processeur
-void confINT0(octet EN_TMR0,octet EN_INT0); //configure les intéruption 0 soit enable ou disable
-
-
-#define analog_module
-#define TRM0_module
-#define aff7seg_module
-#define KeyPad_module
-#define Sequancial_module
-
+void confINT(octet EN_INT0,octet EN_INT1,octet EN_INT2); //configure les intéruption 0 soit enable ou disable
 
 
 #ifdef analog_module 
@@ -60,6 +72,8 @@ int analogRead(octet Pin); // renvoie le binaire de la lecture analogique du Pin
 #endif
 
 #ifdef TRM0_module
+// limit ms = 16 000 000
+
 // Préscaleurs disponibles
 #define PS2_0   0b0000
 #define PS4_0   0b0001
@@ -71,9 +85,142 @@ int analogRead(octet Pin); // renvoie le binaire de la lecture analogique du Pin
 #define PS256_0 0b0111
 #define NPS_0   0b1000
 
-void confTMR0ms(int ms); // configure le TMR0 en ms
-void confTMR0(octet PS,unsigned short reset_delay); // configure le TMR0 et le lance:
+void confTMR0ms(int ms,octet EN_int); // configure le TMR0 en ms
+void confTMR0us(long us,octet EN_int); // configure le TMR0 en us
+void confTMR0(octet PS,unsigned short reset_delay,octet EN_int); // configure le TMR0 et le lance:
 void resetTMR0(void);// ré initialise le TMR0
+#define startTMR0() T0CONbits.TMR0ON = 1
+#define stopTMR0() T0CONbits.TMR0ON = 0
+
+#endif
+
+#ifdef TRM1_module
+
+// limit us = 524 000
+
+// Préscaleurs disponibles
+#define NPS_1   0b00
+#define PS2_1   0b01
+#define PS4_1   0b10
+#define PS8_1   0b11
+
+void confTMR1us(long us,octet EN_int); // configure le TMR1 en us
+void confTMR1(octet PS,unsigned short reset_delay,octet EN_int); // configure le TMR0 et le lance:
+void resetTMR1(void);// ré initialise le TMR0
+#define startTMR1() T1CONbits.TMR1ON = 1
+#define stopTMR1() T1CONbits.TMR1ON = 0
+unsigned short T1PropTime(octet prop);
+
+#endif
+
+#ifdef TRM2_module
+
+// limit us = 65500
+
+// Préscaleurs disponibles
+#define NPRS_2   0b00
+#define PRS4_2   0b01
+#define PRS16_2   0b10
+
+#define NPOS_2    0b0000
+#define P0S2_2    0b0001
+#define P0S3_2    0b0010
+#define P0S4_2    0b0011
+#define P0S5_2    0b0100
+#define P0S6_2    0b0101
+#define P0S7_2    0b0110
+#define P0S8_2    0b0111
+#define P0S9_2    0b1000
+#define P0S10_2   0b1001
+#define P0S11_2   0b1010
+#define P0S12_2   0b1011
+#define P0S13_2   0b1100
+#define P0S14_2   0b1101
+#define P0S15_2   0b1110
+#define P0S16_2   0b1111
+
+void confTMR2us(unsigned int us,octet EN_int);
+void confTMR2(octet PRS,octet POS,octet PR_Delay,octet reset_delay,octet EN_int); 
+void resetTMR2(void);
+#define startTMR2() T2CONbits.TMR2ON = 1
+#define stopTMR2() T2CONbits.TMR2ON = 0
+
+#endif
+
+#ifdef TRM3_module
+
+// limit us = 524 000
+
+// Préscaleurs disponibles
+#define NPS_1   0b00
+#define PS2_1   0b01
+#define PS4_1   0b10
+#define PS8_1   0b11
+
+void confTMR3us(long us,octet EN_int); // configure le TMR3 en us
+void confTMR3(octet PS,unsigned short reset_delay,octet EN_int); // configure le TMR3 et le lance:
+void resetTMR3(void);// ré initialise le TMR3
+#define startTMR3() T3CONbits.TMR3ON = 1
+#define stopTMR3() T3CONbits.TMR3ON = 0
+
+
+#endif
+
+#ifdef CCP1_module
+
+void stopCCP1(void);
+#define resetCCP1IF() CCP1IF = 0
+
+void confComp1(octet compareType,octet TMR_source,unsigned int compVal,octet EN_int);
+void confCapt1(octet captureType,octet TMR_source,octet EN_int);
+#define readCapt1() CCPR1
+
+#ifndef TRM2_module // zone d'interdiction TMR2
+#define PWM_modules
+// periode max = 4000us soit 250Hz min
+int confPWM1(int period_us,unsigned int prop);
+#define confPWM1_8bitmode(period_us,prop) confPWM1(period_us,(int)(prop)<<2);
+#endif
+
+#define CCP_module
+#endif
+
+#ifdef CCP2_module
+
+void stopCCP2(void);
+#define resetCCP2IF() CCP2IF = 0
+
+void confComp2(octet compareType,octet TMR_source,unsigned int compVal,octet EN_int);
+void confCapt2(octet captureType,octet TMR_source,octet EN_int);
+#define readCapt2() CCPR1
+
+#ifndef TRM2_module // zone d'interdiction TMR2
+#define PWM_modules
+// periode max = 4000us soit 250Hz min
+int confPWM2(int period_us,unsigned int prop);
+#define confPWM2_8bitmode(period_us,prop) confPWM2(period_us,(int)(prop)<<2);
+#endif
+
+#define CCP_module
+#endif
+
+#ifdef CCP_module
+
+#define CCP_TMR1_src 0
+#define CCP_TMR3_src 1
+
+#define CCP_capt_falling 0b0100
+#define CCP_capt_rising 0b0101
+#define CCP_capt_4th_rising 0b0110
+#define CCP_capt_16th_rising 0b0111
+
+#define CCP_comp_set_High 0b1001
+#define CCP_comp_set_Low 0b1000
+#define CCP_comp_toggle 0b0010
+#define CCP_comp_stay 0b1010
+#define CCP_comp_special 0b1011
+
+
 #endif
 
 #ifdef aff7seg_module
@@ -129,6 +276,14 @@ void addSequanceStep(t_sequance *seq,t_Step Step);
 t_Step SequanceStep(t_sequance *seq);
 void SequanceSetPos(t_sequance* seq, octet pos);
 #endif
+
+
+// calcules précompilateurs partie Pic+.c
+
+#ifdef PWM_modules
+#define TRM2_module
+#endif
+
 
 #endif	/* PICP_H */
 

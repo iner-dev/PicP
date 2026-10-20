@@ -3,7 +3,7 @@
  * Author: Baptiste LEGRIX
  *
  * Created on 5. octobre 2026, 15:54
- * Pic+ est une librairie de fonction pour accélérer le dev pour la microinfo en C
+ * Pic+ est une librairie de fonction pour accï¿½lï¿½rer le dev pour la microinfo en C
  */
 
 #ifndef PICP_H
@@ -16,7 +16,7 @@
 //#define analog_module
 //#define TRM0_module
 //#define TRM1_module
-//#define TRM2_module // incompatible avec PWM(les commandes PWM sont desactivé)
+//#define TRM2_module // incompatible avec PWM(les commandes PWM sont desactivï¿½)
 //#define TRM3_module
 //#define CCP1_module
 //#define CCP2_module
@@ -40,7 +40,7 @@ typedef volatile unsigned char t_port;
 typedef unsigned char octet; 
 
 void perte_temps(int tempo); // pert des tempo processeur
-void confINT(octet EN_INT0,octet EN_INT1,octet EN_INT2); //configure les intéruption 0 soit enable ou disable
+void confINT(octet EN_INT0,octet EN_INT1,octet EN_INT2); //configure les intï¿½ruption 0 soit enable ou disable
 
 
 #ifdef analog_module 
@@ -57,7 +57,7 @@ void confINT(octet EN_INT0,octet EN_INT1,octet EN_INT2); //configure les intérup
 #define PCFG_ALL 0b0000
 #define PCFG_A0_A4 0b0010
 #define PCFG_A0_1_3 0b0100
-#define PCFG_no_port 0b011x
+#define PCFG_no_port 0b0110
 #define PCFG_A0toA5 0b1001
 #define PCFG_A0 0b1110
 
@@ -65,16 +65,16 @@ void confINT(octet EN_INT0,octet EN_INT1,octet EN_INT2); //configure les intérup
 
 #define defaultConfAnalogTomV 21.8,5085.5
 
-void confAnalogTomV(double min,double max);// re définie la config de analogTomV en fonction des tentions min et max
+void confAnalogTomV(double min,double max);// re dï¿½finie la config de analogTomV en fonction des tentions min et max
 int analogTomV(int analog); // convertie le binaire du analogRead en tention en mV en fonction de la config
 void confAnalog(octet mode_10bit,octet PCFG); // config analog input
-int analogRead(octet Pin); // renvoie le binaire de la lecture analogique du Pin, les paramétres de lectures sont réglé dans confAnalog
+int analogRead(octet Pin); // renvoie le binaire de la lecture analogique du Pin, les paramï¿½tres de lectures sont rï¿½glï¿½ dans confAnalog
 #endif
 
 #ifdef TRM0_module
 // limit ms = 16 000 000
 
-// Préscaleurs disponibles
+// Prï¿½scaleurs disponibles
 #define PS2_0   0b0000
 #define PS4_0   0b0001
 #define PS8_0   0b0010
@@ -88,7 +88,7 @@ int analogRead(octet Pin); // renvoie le binaire de la lecture analogique du Pin
 void confTMR0ms(int ms,octet EN_int); // configure le TMR0 en ms
 void confTMR0us(long us,octet EN_int); // configure le TMR0 en us
 void confTMR0(octet PS,unsigned short reset_delay,octet EN_int); // configure le TMR0 et le lance:
-void resetTMR0(void);// ré initialise le TMR0
+void resetTMR0(void);// rï¿½ initialise le TMR0
 #define startTMR0() T0CONbits.TMR0ON = 1
 #define stopTMR0() T0CONbits.TMR0ON = 0
 
@@ -98,7 +98,7 @@ void resetTMR0(void);// ré initialise le TMR0
 
 // limit us = 524 000
 
-// Préscaleurs disponibles
+// Prï¿½scaleurs disponibles
 #define NPS_1   0b00
 #define PS2_1   0b01
 #define PS4_1   0b10
@@ -106,7 +106,7 @@ void resetTMR0(void);// ré initialise le TMR0
 
 void confTMR1us(long us,octet EN_int); // configure le TMR1 en us
 void confTMR1(octet PS,unsigned short reset_delay,octet EN_int); // configure le TMR0 et le lance:
-void resetTMR1(void);// ré initialise le TMR0
+void resetTMR1(void);// rï¿½ initialise le TMR0
 #define startTMR1() T1CONbits.TMR1ON = 1
 #define stopTMR1() T1CONbits.TMR1ON = 0
 unsigned short T1PropTime(octet prop);
@@ -117,7 +117,7 @@ unsigned short T1PropTime(octet prop);
 
 // limit us = 65500
 
-// Préscaleurs disponibles
+// Prï¿½scaleurs disponibles
 #define NPRS_2   0b00
 #define PRS4_2   0b01
 #define PRS16_2   0b10
@@ -151,7 +151,7 @@ void resetTMR2(void);
 
 // limit us = 524 000
 
-// Préscaleurs disponibles
+// Prï¿½scaleurs disponibles
 #define NPS_1   0b00
 #define PS2_1   0b01
 #define PS4_1   0b10
@@ -159,7 +159,7 @@ void resetTMR2(void);
 
 void confTMR3us(long us,octet EN_int); // configure le TMR3 en us
 void confTMR3(octet PS,unsigned short reset_delay,octet EN_int); // configure le TMR3 et le lance:
-void resetTMR3(void);// ré initialise le TMR3
+void resetTMR3(void);// rï¿½ initialise le TMR3
 #define startTMR3() T3CONbits.TMR3ON = 1
 #define stopTMR3() T3CONbits.TMR3ON = 0
 
@@ -224,9 +224,11 @@ int confPWM2(int period_us,unsigned int prop);
 #endif
 
 #ifdef aff7seg_module
+
 void conf7seg(t_port *port,t_port *dis,octet pos_dis0);// configure write7seg port etant le port des led dis le port des dis et le pos dis0 donne la pos du bit dis0 dans dis
 octet convert7seg(octet chiffre ); // renvoie le code led d'un 7seg
-void write7seg(int val,octet points);// affiche val sur les 7 seg configuré, il y ajoute les points au formas 0b0000xxxx 1:étind 0: alummé
+void write7seg(int val,octet points);// affiche val sur les 7 seg configurï¿½, il y ajoute les points au formas 0b0000xxxx 1:ï¿½tind 0: alummï¿½
+
 #endif
 
 #ifdef KeyPad_module
@@ -278,7 +280,7 @@ void SequanceSetPos(t_sequance* seq, octet pos);
 #endif
 
 
-// calcules précompilateurs partie Pic+.c
+// calcules prï¿½compilateurs partie Pic+.c
 
 #ifdef PWM_modules
 #define TRM2_module

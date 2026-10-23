@@ -22,6 +22,192 @@ void perte_temps(int tempo){
     for(;tempo>0;tempo--);
 }
 
+void DisableADConvert(){
+    ADCON1bits.PCFG = 0b0110;
+    ADCON0bits.ADON = 0;
+}
+
+#ifdef Virtual_Port_module
+
+void beginVPort(t_VirtualPort *VPort){
+    VPort->len = 0;
+}
+
+void addBitsVPort(t_VirtualPort *VPort,t_portID Port,octet startID,signed char lenght){
+    VPort->bits[VPort->len].startID = startID;
+    if(lenght<0){
+        //cas negatif
+        VPort->bits[VPort->len].portID = Port+5;
+        startID += lenght+1;
+        lenght=-lenght;
+    }else{
+        //cas positif
+        VPort->bits[VPort->len].portID = Port;
+    }
+    VPort->bits[VPort->len].mask = 0b1<<startID;
+    VPort->bits[VPort->len].len = lenght;
+    for(octet i=1;i<lenght;i++){
+        VPort->bits[VPort->len].mask = VPort->bits[VPort->len].mask | (VPort->bits[VPort->len].mask<<1);
+    }
+    VPort->len++;
+}
+
+octet reverse_bits(octet n) {
+    // 1. Échange les blocs de 4 bits (nibbles)
+    n = ((n >> 4) & 0x0F) | ((n << 4) & 0xF0);
+    // 2. Échange les blocs de 2 bits
+    n = ((n >> 2) & 0x33) | ((n << 2) & 0xCC);
+    // 3. Échange les bits adjacents
+    n = ((n >> 1) & 0x55) | ((n << 1) & 0xAA);
+    return n;
+}
+
+octet readChunk(t_portID portID,octet mask,octet startID,octet len){
+    switch(portID){
+        case 0  : return (PORTA&mask)>>startID; //PortA
+        case 1  : return (PORTB&mask)>>startID; //PortB
+        case 2  : return (PORTC&mask)>>startID; //PortC
+        case 3  : return (PORTD&mask)>>startID; //PortD
+        case 4  : return (PORTE&mask)>>startID; //PortE
+        case 5  : return reverse_bits(PORTA&mask)>>(8-startID-len); //RevPortA
+        case 6  : return reverse_bits(PORTB&mask)>>(8-startID-len); //RevPortB
+        case 7  : return reverse_bits(PORTC&mask)>>(8-startID-len); //RevPortC
+        case 8  : return reverse_bits(PORTD&mask)>>(8-startID-len); //RevPortD
+        case 9  : return reverse_bits(PORTE&mask)>>(8-startID-len); //RevPortE
+        default : return 0;
+    }
+}
+
+void writeChunk(t_portID portID,octet mask,octet startID,octet len,octet val){
+    switch(portID){
+        case 0  : PORTA = byteMerge(PORTA,val<<startID,mask); return; //PortA
+        case 1  : PORTB = byteMerge(PORTB,val<<startID,mask); return; //PortA
+        case 2  : PORTC = byteMerge(PORTC,val<<startID,mask); return; //PortA
+        case 3  : PORTD = byteMerge(PORTD,val<<startID,mask); return; //PortA
+        case 4  : PORTE = byteMerge(PORTE,val<<startID,mask); return; //PortA
+        case 5  : PORTA = byteMerge(PORTA,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 6  : PORTB = byteMerge(PORTB,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 7  : PORTC = byteMerge(PORTC,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 8  : PORTD = byteMerge(PORTD,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 9  : PORTE = byteMerge(PORTE,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        default : return ;
+    }
+}
+
+void trisChunk(t_portID portID,octet mask,octet startID,octet len,octet val){
+    switch(portID){
+        case 0  : TRISA = byteMerge(TRISA,val<<startID,mask); return; //PortA
+        case 1  : TRISB = byteMerge(TRISB,val<<startID,mask); return; //PortA
+        case 2  : TRISC = byteMerge(TRISC,val<<startID,mask); return; //PortA
+        case 3  : TRISD = byteMerge(TRISD,val<<startID,mask); return; //PortA
+        case 4  : TRISE = byteMerge(TRISE,val<<startID,mask); return; //PortA
+        case 5  : TRISA = byteMerge(TRISA,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 6  : TRISB = byteMerge(TRISB,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 7  : TRISC = byteMerge(TRISC,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 8  : TRISD = byteMerge(TRISD,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        case 9  : TRISE = byteMerge(TRISE,reverse_bits(val)>>(8-startID-len),mask); return ; //RevPortA
+        default : return ;
+    }
+}
+
+octet readVPort(t_VirtualPort *VPort){
+    octet ret=0,lenCalc=0;
+    for(octet i = 0;i<(VPort->len);i++){
+        ret += readChunk(
+                VPort->bits[i].portID,
+                VPort->bits[i].mask,
+                VPort->bits[i].startID,
+                VPort->bits[i].len)<<lenCalc;
+        lenCalc += VPort->bits[i].len;
+    }
+    return ret;
+}
+
+void writeVPort(t_VirtualPort *VPort, octet data){
+    octet lenCalc=0;
+    for(octet i = 0;i<(VPort->len);i++){
+        writeChunk(
+                VPort->bits[i].portID,
+                VPort->bits[i].mask,
+                VPort->bits[i].startID,
+                VPort->bits[i].len,
+                data>>lenCalc
+                );
+        lenCalc += VPort->bits[i].len;
+    }
+}
+
+void trisVPort(t_VirtualPort *VPort, octet tris){
+    octet lenCalc=0;
+    for(octet i = 0;i<(VPort->len);i++){
+        trisChunk(
+            VPort->bits[i].portID,
+            VPort->bits[i].mask,
+            VPort->bits[i].startID,
+            VPort->bits[i].len,
+            tris>>lenCalc
+        );
+        lenCalc += VPort->bits[i].len;
+    }
+}
+
+void writeVPin(t_VirtualPort *VPort, octet data,octet pin){
+    octet lenCalc=0,pos = 0;
+    for(octet i = 0;i<(VPort->len);i++){
+        if((lenCalc+VPort->bits[i].len)>pin){
+            //on a le bon chunk
+            pos = (pin-lenCalc)*((lenCalc+VPort->bits[i].portID)>=5 ? -1 : 1) + VPort->bits[i].startID;
+            switch(VPort->bits[i].portID%5){
+                case 0  : PORTA = byteMerge(PORTA,data<<pos,0b1<<pos); return; //PortA
+                case 1  : PORTB = byteMerge(PORTB,data<<pos,0b1<<pos); return; //PortB
+                case 2  : PORTC = byteMerge(PORTC,data<<pos,0b1<<pos); return; //PortC
+                case 3  : PORTD = byteMerge(PORTD,data<<pos,0b1<<pos); return; //PortD
+                case 4  : PORTE = byteMerge(PORTE,data<<pos,0b1<<pos); return; //PortE
+            }
+        }
+        lenCalc += VPort->bits[i].len;
+    }
+}
+
+void trisVPin(t_VirtualPort *VPort, octet tris,octet pin){
+    octet lenCalc=0,pos = 0;
+    for(octet i = 0;i<(VPort->len);i++){
+        if((lenCalc+VPort->bits[i].len)>pin){
+            //on a le bon chunk
+            pos = (pin-lenCalc)*((lenCalc+VPort->bits[i].portID)>=5 ? -1 : 1) + VPort->bits[i].startID;
+            switch(VPort->bits[i].portID%5){
+                case 0  : TRISA = byteMerge(TRISA,tris<<pos,0b1<<pos); return; //PortA
+                case 1  : TRISB = byteMerge(TRISB,tris<<pos,0b1<<pos); return; //PortB
+                case 2  : TRISC = byteMerge(TRISC,tris<<pos,0b1<<pos); return; //PortC
+                case 3  : TRISD = byteMerge(TRISD,tris<<pos,0b1<<pos); return; //PortD
+                case 4  : TRISE = byteMerge(TRISE,tris<<pos,0b1<<pos); return; //PortE
+            }
+        }
+        lenCalc += VPort->bits[i].len;
+    }
+}
+
+octet readVPin(t_VirtualPort *VPort,octet pin){
+    octet lenCalc=0,pos = 0;
+    for(octet i = 0;i<(VPort->len);i++){
+        if((lenCalc+VPort->bits[i].len)>pin){
+            //on a le bon chunk
+            pos = (pin-lenCalc)*((lenCalc+VPort->bits[i].portID)>=5 ? -1 : 1) + VPort->bits[i].startID;
+            switch(VPort->bits[i].portID%5){
+                case 0  : return PORTA&(0b1<<pos)>0; //PortA
+                case 1  : return PORTB&(0b1<<pos)>0; //PortB
+                case 2  : return PORTC&(0b1<<pos)>0; //PortC
+                case 3  : return PORTD&(0b1<<pos)>0; //PortD
+                case 4  : return PORTE&(0b1<<pos)>0; //PortE
+            }
+        }
+        lenCalc += VPort->bits[i].len;
+    }
+    return 0;
+}
+
+#endif
+
 #ifdef analog_module
 
 double gain_ATmV;
@@ -323,10 +509,26 @@ int confPWM2(int period_us,unsigned int prop){
 // 7seg config save
 volatile unsigned char *port_7seg;
 volatile unsigned char *dis_7seg;
+#ifdef Virtual_Port_module
+t_VirtualPort *Vport_7seg;
+t_VirtualPort *Vdis_7seg;
+octet modeVP_7seg=0;
+#endif
 unsigned char mask_dis0_7seg;
 unsigned char mask_dis1_7seg;
 unsigned char mask_dis2_7seg;
 unsigned char mask_dis3_7seg;
+
+
+#ifdef Virtual_Port_module
+void conf7segVP(t_VirtualPort *port,t_VirtualPort *dis){
+    modeVP_7seg=1;
+    Vport_7seg = port;
+    Vdis_7seg = dis;
+    trisVPort(Vport_7seg,0x00);
+    trisVPort(Vdis_7seg,0x00);
+}
+#endif
 
 octet convert7seg(octet chiffre ){
     chiffre = chiffre & 0b00001111;
@@ -352,6 +554,9 @@ octet convert7seg(octet chiffre ){
 }
 
 void conf7seg(t_port *port,t_port *dis,octet pos_dis0){
+    #ifdef Virtual_Port_module
+    modeVP_7seg=0;
+    #endif
     port_7seg=port;
     dis_7seg=dis;
     mask_dis0_7seg = (unsigned char)(0b00000001 << pos_dis0);
@@ -360,31 +565,85 @@ void conf7seg(t_port *port,t_port *dis,octet pos_dis0){
     mask_dis3_7seg = (unsigned char)(0b00000001 << (pos_dis0+3));
 }
 
+void writeExa7seg(unsigned int val,unsigned char points){
+    #ifdef Virtual_Port_module
+    if(modeVP_7seg==1){// version VPort
+        points = ~points;
+        for(octet i = 0;i<4;i++){
+            writeVPort(Vport_7seg,byteMerge(convert7seg(val&0x000F),points,0b00000001));
+            writeVPin(Vdis_7seg,0,3-i);
+            perte_temps(100);
+            writeVPin(Vdis_7seg,1,3-i);
+            val= val>>4;
+            points = points>>1;
+        }
+        return;
+    }
+    #endif
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val&0x000F)),~points,0b00000001);
+    *dis_7seg = *dis_7seg&(~mask_dis3_7seg);// set disN a 0
+    perte_temps(100);
+    *dis_7seg = *dis_7seg|mask_dis3_7seg;// set disN a 1
+    val= val>>4;
+    
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val&0x000F)),~points>>1,0b00000001);
+    *dis_7seg = *dis_7seg&(~mask_dis2_7seg);// set disN a 0
+    perte_temps(100);
+    *dis_7seg = *dis_7seg|mask_dis2_7seg;// set disN a 1
+    val= val>>4;
+    
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val&0x000F)),~points>>2,0b00000001);
+    *dis_7seg = *dis_7seg&(~mask_dis1_7seg);// set disN a 0
+    perte_temps(100);
+    *dis_7seg = *dis_7seg|mask_dis1_7seg;// set disN a 1
+    val= val>>4;
+    
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val&0x000F)),~points>>3,0b00000001);
+    *dis_7seg = *dis_7seg&(~mask_dis0_7seg);// set disN a 0
+    perte_temps(100);
+    *dis_7seg = *dis_7seg|mask_dis0_7seg;// set disN a 1
+}
+
 void write7seg(int val,unsigned char points){
+    #ifdef Virtual_Port_module
+    if(modeVP_7seg==1){// version VPort
+        points = ~points;
+        for(octet i = 0;i<4;i++){
+            writeVPort(Vport_7seg,byteMerge(convert7seg(val%10),points,0b00000001));
+            writeVPin(Vdis_7seg,0,3-i);
+            perte_temps(100);
+            writeVPin(Vdis_7seg,1,3-i);
+            val= val/10;
+            points = points>>1;
+        }
+        return;
+    }
+    #endif
+    //sinon mode normal
     // DIS3 (le plus à droite)
     
-    *port_7seg = byteMerge(convert7seg(val%10),points,0b00000001);
+    *port_7seg = byteMerge(convert7seg(val%10),~points,0b00000001);
     *dis_7seg = *dis_7seg&(~mask_dis3_7seg);// set disN a 0
     perte_temps(100);
     *dis_7seg = *dis_7seg|mask_dis3_7seg;// set disN a 1
     val= val/10;
     
     // DIS2 (le plus à droite)
-    *port_7seg = byteMerge(convert7seg((unsigned char)(val%10)),points>>1,0b00000001);
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val%10)),~points>>1,0b00000001);
     *dis_7seg = *dis_7seg&(~mask_dis2_7seg);// set disN a 0
     perte_temps(100);
     *dis_7seg = *dis_7seg|mask_dis2_7seg;// set disN a 1
     val= val/10;
     
     // DIS1 (le plus à droite)
-    *port_7seg = byteMerge(convert7seg((unsigned char)(val%10)),points>>2,0b00000001);
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val%10)),~points>>2,0b00000001);
     *dis_7seg = *dis_7seg&(~mask_dis1_7seg);// set disN a 0
     perte_temps(100);
     *dis_7seg = *dis_7seg|mask_dis1_7seg;// set disN a 1
     val= val/10;
     
     // DIS0 (le plus à droite)
-    *port_7seg = byteMerge(convert7seg((unsigned char)(val%10)),points>>3,0b00000001);
+    *port_7seg = byteMerge(convert7seg((unsigned char)(val%10)),~points>>3,0b00000001);
     *dis_7seg = *dis_7seg&(~mask_dis0_7seg);// set disN a 0
     perte_temps(100);
     *dis_7seg = *dis_7seg|mask_dis0_7seg;// set disN a 1
@@ -392,19 +651,56 @@ void write7seg(int val,unsigned char points){
 #endif
 
 #ifdef KeyPad_module
+#ifdef Virtual_Port_module
+octet KeyPad_mode = 0;
+t_port* KeyPad_VPort;
+#endif
+t_port* KeyPad_port;
 
-t_key_bitmap keyPadRead(t_port *port){
+
+void confKeyPad(t_port *port){
+    KeyPad_mode = 0;
+    KeyPad_port = port;
+}
+#ifdef Virtual_Port_module
+void confKeyPadVP(t_VirtualPort *port){
+    KeyPad_mode = 1;
+    KeyPad_VPort = port;
+    trisVPort(KeyPad_VPort,0x0F);
+}
+#endif
+t_key_bitmap keyPadRead(){
     unsigned int ret=0;
     char i;
-    *port = 0b00010000;
-    ret=(ret|(*port & 0b00001111));
+    #ifdef Virtual_Port_module
+    if(KeyPad_mode){
+        writeVPort(KeyPad_VPort,0b00010000);
+        ret=(ret|(readVPort(KeyPad_VPort) & 0b00001111));
+        for(i=1;i<4;i++){
+            writeVPort(KeyPad_VPort,(octet)(0b00010000<<i));
+            ret=ret<<4;
+            ret=ret|(readVPort(KeyPad_VPort) & 0b00001111);
+        }
+    return ret;
+    }
+    #endif
+    *KeyPad_port = 0b00010000;
+    ret=(ret|(*KeyPad_port & 0b00001111));
     for(i=1;i<4;i++){
-        *port = (unsigned char)(0b00010000<<i);
+        *KeyPad_port = (unsigned char)(0b00010000<<i);
         ret=ret<<4;
-        ret=ret|(*port & 0b00001111);
+        ret=ret|(*KeyPad_port & 0b00001111);
     }
     return ret;
 }
+
+#ifdef Virtual_Port_module
+t_key_bitmap keyPadReadVP(t_VirtualPort *port){
+    unsigned int ret=0;
+    char i;
+    
+}
+#endif
 
 octet isKeySet(t_key_bitmap scan,t_key_bitmap key){
     return (scan & key)>0;
@@ -438,6 +734,46 @@ octet keyBitmapToInt(t_key_bitmap val){
         default:           return Default_KBTI;
     }
 }
+
+octet keyBitmapToIntPL(t_key_bitmap val){
+    if(isKeySet(val,KEY_0)) return 0;
+    if(isKeySet(val,KEY_1)) return 1;
+    if(isKeySet(val,KEY_2)) return 2;
+    if(isKeySet(val,KEY_3)) return 3;
+    if(isKeySet(val,KEY_4)) return 4;
+    if(isKeySet(val,KEY_5)) return 5;
+    if(isKeySet(val,KEY_6)) return 6;
+    if(isKeySet(val,KEY_7)) return 7;
+    if(isKeySet(val,KEY_8)) return 8;
+    if(isKeySet(val,KEY_9)) return 9;
+    if(isKeySet(val,KEY_A)) return 10;
+    if(isKeySet(val,KEY_B)) return 11;
+    if(isKeySet(val,KEY_C)) return 12;
+    if(isKeySet(val,KEY_D)) return 13;
+    if(isKeySet(val,KEY_Star)) return 14;
+    if(isKeySet(val,KEY_Hashtag)) return 15;
+    return Default_KBTI;
+}
+
+octet keyBitmapToIntPG(t_key_bitmap val){
+    if(isKeySet(val,KEY_Hashtag)) return 15;
+    if(isKeySet(val,KEY_Star)) return 14;
+    if(isKeySet(val,KEY_D)) return 13;
+    if(isKeySet(val,KEY_C)) return 12;
+    if(isKeySet(val,KEY_B)) return 11;
+    if(isKeySet(val,KEY_A)) return 10;
+    if(isKeySet(val,KEY_9)) return 9;
+    if(isKeySet(val,KEY_8)) return 8;
+    if(isKeySet(val,KEY_7)) return 7;
+    if(isKeySet(val,KEY_6)) return 6;
+    if(isKeySet(val,KEY_5)) return 5;
+    if(isKeySet(val,KEY_4)) return 4;
+    if(isKeySet(val,KEY_3)) return 3;
+    if(isKeySet(val,KEY_2)) return 2;
+    if(isKeySet(val,KEY_1)) return 1;
+    if(isKeySet(val,KEY_0)) return 0;
+    return Default_KBTI;
+}
 #endif
 
 #ifdef Sequancial_module
@@ -461,4 +797,113 @@ t_Step SequanceStep(t_sequance *seq){
 void SequanceSetPos(t_sequance* seq, octet pos){
     seq->pos = pos;
 }
+#endif
+
+#ifdef Virtual_Port_module
+#ifdef LCD_module
+t_VirtualPort *DataPortLCD;
+t_VirtualPort *ControlePortLCD; // 0 -> RS, 1 -> RW, 2 -> E
+
+#define LCD_RS 0
+#define LCD_RW 1
+#define LCD_E  2
+
+octet LireTrameLCD(octet type){
+    octet trame;
+    trisVPort(DataPortLCD,0xFF);// lecture
+    writeVPin(ControlePortLCD,type,LCD_RS);
+    writeVPin(ControlePortLCD,1,LCD_RW);
+    writeVPin(ControlePortLCD,1,LCD_E);
+    trame = readVPort(DataPortLCD);
+    writeVPin(ControlePortLCD,0,LCD_E);
+    return trame;
+}
+
+void EcrireTrameLCD(octet type,char trame){
+    if(type==2){
+        writeVPin(ControlePortLCD,LCD_Command,LCD_RS);
+    }else{
+        busy();
+        writeVPin(ControlePortLCD,type,LCD_RS);
+    }
+    trisVPort(DataPortLCD,0x00);// ecriteure
+    writeVPin(ControlePortLCD,0,LCD_RW);
+    writeVPort(DataPortLCD,trame);
+    writeVPin(ControlePortLCD,1,LCD_E);
+    writeVPin(ControlePortLCD,0,LCD_E);
+}
+
+void confLCD(t_VirtualPort *DataPort,t_VirtualPort *ControlePort){
+    DataPortLCD = DataPort;
+    ControlePortLCD = ControlePort;
+    trisVPort(ControlePort,0b000);
+    EcrireTrameLCD(LCD_First_Command,0b00111011);
+    EcrireTrameLCD(LCD_Command,0x0F);
+    EcrireTrameLCD(LCD_Command,0b110);
+    EcrireTrameLCD(LCD_Command,0x01);
+    EcrireTrameLCD(LCD_Command,0x02);
+}
+
+void printIntLCD(int val){
+    octet chifre,decimales=1 ;
+    if(val<0) {
+        EcrireTrameLCD(LCD_DATA,'-');
+        val = -val;
+    }
+    if(val>0){
+        decimales = 4;
+        while(val<1000){
+            val = val*10;
+            --decimales;
+        }
+        if(val>=10000){
+            EcrireTrameLCD(LCD_DATA,(char)(val/10000+48));
+        }
+    }
+    chifre = (val/1000)%10;
+    for(octet i =0;i<decimales;i++){
+        EcrireTrameLCD(LCD_DATA,(char)(chifre+48));
+        val = 10*(val%1000);
+        chifre = (val/1000);
+    }
+}
+
+void clearLCD(){
+    EcrireTrameLCD(LCD_Command,0x01);
+    EcrireTrameLCD(LCD_Command,0x02);
+}
+
+void gotoLCD(octet ligne,octet pos){
+    EcrireTrameLCD(LCD_Command,0b10000000|(ligne*0x40)|pos);
+}
+
+void printLCD(char* text){
+    for(octet i=0;i<40;i++){
+        switch(text[i]){
+            case '\0':
+                i = 50;
+                break;
+            case '\n':
+                EcrireTrameLCD(LCD_Command,0b11000000);
+                break;
+            case '\r':
+                EcrireTrameLCD(LCD_Command,0b10000000);
+                break;
+            default:
+                EcrireTrameLCD(LCD_DATA,text[i]);
+                break;
+        };
+    }
+}
+
+void confCurseurLCD(octet DisplayAll,octet CuseurDisplay,octet Blinking){
+    EcrireTrameLCD(LCD_Command,0b1000|((DisplayAll*0b100)&0b100)|((CuseurDisplay*0b10)&0b10)|((Blinking)&0b1));
+}
+
+void moveLCD(octet typeMove,octet versLaDroite){
+    EcrireTrameLCD(LCD_Command,0b10000|((typeMove*0b1000)&0b1000)|((versLaDroite*0b100)&0b100));
+}
+
+
+#endif
 #endif

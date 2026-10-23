@@ -13,17 +13,18 @@
 
 
 // liste des modules pour l'activation
-//#define analog_module
-//#define TRM0_module
+#define analog_module
+#define TRM0_module
 //#define TRM1_module
 //#define TRM2_module // incompatible avec PWM(les commandes PWM sont desactivï¿½)
 //#define TRM3_module
-//#define CCP1_module
+#define CCP1_module
 //#define CCP2_module
 //#define aff7seg_module
-//#define KeyPad_module
+#define KeyPad_module
 //#define Sequancial_module
-
+#define Virtual_Port_module
+#define LCD_module  // uniquement fonctionelle avec des Virtual port
 
 
 
@@ -36,11 +37,52 @@
 
 #define byteMerge(A,B,Mask) ((A & ~Mask)|(B & Mask)) // fusione binairemant 2 variables en fonction du mask 0:A 1:B
 
-typedef volatile unsigned char t_port;
 typedef unsigned char octet; 
+typedef volatile octet t_port;
 
 void perte_temps(int tempo); // pert des tempo processeur
 void confINT(octet EN_INT0,octet EN_INT1,octet EN_INT2); //configure les intï¿½ruption 0 soit enable ou disable
+void DisableADConvert();
+
+
+// VirtualPort
+
+
+#ifdef Virtual_Port_module
+
+typedef octet t_portID; // alias
+
+typedef struct{
+    octet len;
+    struct{
+        octet portID;
+        octet startID;
+        octet mask;
+        octet len;
+    } bits[8];
+} t_VirtualPort;
+
+#define PA 0 //PORTA ID
+#define PB 1 //PORTB ID
+#define PC 2 //PORTC ID
+#define PD 3 //PORTD ID
+#define PE 4 //PORTE ID
+
+const t_VirtualPort VPA = {1,{{PA,0,0b01111111,7}}};
+const t_VirtualPort VPB = {1,{{PB,0,0b00111111,6}}};
+const t_VirtualPort VPC = {1,{{PC,0,0b11111111,8}}};
+const t_VirtualPort VPD = {1,{{PD,0,0b11111111,8}}};
+const t_VirtualPort VPE = {1,{{PE,0,0b00000111,3}}};
+
+void beginVPort(t_VirtualPort *VPort);
+void addBitsVPort(t_VirtualPort *VPort,t_portID Port,octet startID,signed char lenght);
+octet readVPort(t_VirtualPort *VPort);
+octet readVPin(t_VirtualPort *VPort,octet pin);
+void writeVPort(t_VirtualPort *VPort, octet data);
+void writeVPin(t_VirtualPort *VPort, octet data,octet pin);
+void trisVPort(t_VirtualPort *VPort, octet tris);
+void trisVPin(t_VirtualPort *VPort, octet tris,octet pin);
+#endif
 
 
 #ifdef analog_module 
@@ -224,10 +266,14 @@ int confPWM2(int period_us,unsigned int prop);
 #endif
 
 #ifdef aff7seg_module
-
 void conf7seg(t_port *port,t_port *dis,octet pos_dis0);// configure write7seg port etant le port des led dis le port des dis et le pos dis0 donne la pos du bit dis0 dans dis
 octet convert7seg(octet chiffre ); // renvoie le code led d'un 7seg
 void write7seg(int val,octet points);// affiche val sur les 7 seg configurï¿½, il y ajoute les points au formas 0b0000xxxx 1:ï¿½tind 0: alummï¿½
+void writeExa7seg(unsigned int val,unsigned char points);
+
+#ifdef Virtual_Port_module
+void conf7segVP(t_VirtualPort *port,t_VirtualPort *dis);
+#endif
 
 #endif
 
@@ -256,11 +302,17 @@ void write7seg(int val,octet points);// affiche val sur les 7 seg configurï¿½, i
 
 typedef unsigned int t_key_bitmap;
 
-
-t_key_bitmap keyPadRead(t_port *port); // effectue une lecture d'un keypad et l'ecrit au format 0bxxxxxxxxxxxxxxxx le tris du port doit etre TRISX = 0x0F;
+void confKeyPad(t_port *port);
+t_key_bitmap keyPadRead(); // effectue une lecture d'un keypad et l'ecrit au format 0bxxxxxxxxxxxxxxxx le tris du port doit etre TRISX = 0x0F;
 octet isKeySet(t_key_bitmap scan,t_key_bitmap key);
 t_key_bitmap keyBitmapChange(t_key_bitmap scan);
 octet keyBitmapToInt(t_key_bitmap val);
+octet keyBitmapToIntPL(t_key_bitmap val);
+octet keyBitmapToIntPG(t_key_bitmap val);
+
+#ifdef Virtual_Port_module
+void confKeyPadVP(t_VirtualPort *port);
+#endif
 #endif
 
 #ifdef Sequancial_module
@@ -279,8 +331,30 @@ t_Step SequanceStep(t_sequance *seq);
 void SequanceSetPos(t_sequance* seq, octet pos);
 #endif
 
+#ifdef LCD_module
+#ifdef Virtual_Port_module
 
-// calcules prï¿½compilateurs partie Pic+.c
+#define LCD_Command 0b0
+#define LCD_First_Command 2
+#define LCD_DATA 0b1
+#define LCDMoveCurseur 0
+#define LCDMoveAffichage 1
+#define busy() while((LireTrameLCD(LCD_Command)&0b10000000)>0){}
+
+octet LireTrameLCD(octet type);
+void EcrireTrameLCD(octet type,char trame);
+void confLCD(t_VirtualPort *DataPort,t_VirtualPort *ControlePort);
+void printIntLCD(int val);
+void clearLCD();
+void gotoLCD(octet ligne,octet pos);
+void printLCD(char* text);
+void confCurseurLCD(octet DisplayAll,octet CuseurDisplay,octet Blinking);
+void moveLCD(octet typeMove,octet versLaDroite);
+
+#endif
+#endif
+
+// calcules précompilateurs partie Pic+.c
 
 #ifdef PWM_modules
 #define TRM2_module
@@ -288,4 +362,3 @@ void SequanceSetPos(t_sequance* seq, octet pos);
 
 
 #endif	/* PICP_H */
-

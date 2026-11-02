@@ -13,18 +13,18 @@
 
 
 // liste des modules pour l'activation
-#define analog_module
-#define TRM0_module
+//#define analog_module
+//#define TRM0_module
 //#define TRM1_module
 //#define TRM2_module // incompatible avec PWM(les commandes PWM sont desactivï¿½)
 //#define TRM3_module
-#define CCP1_module
+//#define CCP1_module
 //#define CCP2_module
 //#define aff7seg_module
-#define KeyPad_module
+//#define KeyPad_module
 //#define Sequancial_module
-#define Virtual_Port_module
-#define LCD_module  // uniquement fonctionelle avec des Virtual port
+//#define Virtual_Port_module
+//#define LCD_module  // uniquement fonctionelle avec des Virtual port
 
 
 
@@ -354,7 +354,7 @@ void moveLCD(octet typeMove,octet versLaDroite);
 #endif
 #endif
 
-// calcules précompilateurs partie Pic+.c
+// calcules prï¿½compilateurs partie Pic+.c
 
 #ifdef PWM_modules
 #define TRM2_module
